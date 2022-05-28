@@ -67,8 +67,13 @@ def eval_trained_model(config_name,
         bpp = get_arithmetic_coding_bpp(
             bitstring, bitstring_np, num_pixels=h * w)
 
+        # metrics = {'psnr': get_psnr(inp_np, otp_np),
+        #            'bpp_real': bpp}
+
         metrics = {'psnr': get_psnr(inp_np, otp_np),
-                   'bpp_real': bpp}
+                   'bpp_real': bpp,
+                   'ms_ssim' : get_ms_ssim(inp_np, otp_np, sess)}
+        
 
         metrics_str = ' / '.join(f'{metric}: {value:.5f}'
                                  for metric, value in metrics.items())
@@ -100,6 +105,10 @@ def get_arithmetic_coding_bpp(bitstring, bitstring_np, num_pixels):
   packed.pack(tensors=bitstring, arrays=bitstring_np)
   return len(packed.string) * 8 / num_pixels
 
+def get_ms_ssim(inp, opt, sess):
+  val = tf.image.ssim_multiscale(inp, opt, 255)
+  ssm_val = sess.run(val)
+  return ssm_val
 
 def get_psnr(inp, otp):
   mse = np.mean(np.square(inp.astype(np.float32) - otp.astype(np.float32)))
