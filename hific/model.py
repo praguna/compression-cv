@@ -14,14 +14,6 @@ from hific.helpers import ModelType
 from hific.helpers import TFDSArguments
 
 
-# How many dataset preprocessing processes to use.
-DATASET_NUM_PARALLEL = 8
-
-# How many batches to prefetch.
-DATASET_PREFETCH_BUFFER = 20
-
-# How many batches to fetch for shuffling.
-DATASET_SHUFFLE_BUFFER = 10
 
 BppPair = collections.namedtuple(
     "BppPair", ["total_nbpp", "total_qbpp"])
@@ -164,11 +156,11 @@ class HiFiC(object):
     self._lpips_loss = None
     self._entropy_model = None
     self._optimize_entropy_vars = True
-    self._global_step_disc = None  # global_step used for D training
+    self._global_step_disc = None  
 
     self._setup_discriminator = (
         self._model_type == ModelType.COMPRESSION_GAN
-        and (self.training or self.validation))  # No disc for evaluation.
+        and (self.training or self.validation)) 
 
     if self._setup_discriminator:
       self._num_steps_disc = self._config.num_steps_disc
@@ -188,9 +180,6 @@ class HiFiC(object):
                 shape=(None, None, None, 3))}
 
     if self._setup_discriminator:
-      # This is an optional argument to build_model. If training a
-      # discriminator, this is expected to contain multiple sub-batches.
-      # See build_input for details.
       self.input_spec["input_images_d_steps"] = tf.keras.layers.InputSpec(
           dtype=tf.uint8,
           shape=(None, None, None, 3))
@@ -337,14 +326,14 @@ class HiFiC(object):
         return image
 
       dataset = dataset.map(
-          _preprocess, num_parallel_calls=DATASET_NUM_PARALLEL)
+          _preprocess, num_parallel_calls=8)
       dataset = dataset.batch(batch_size, drop_remainder=True)
 
       if not self.evaluation:
         # Make sure we don't run out of data
         dataset = dataset.repeat()
-        dataset = dataset.shuffle(buffer_size=DATASET_SHUFFLE_BUFFER)
-      dataset = dataset.prefetch(buffer_size=DATASET_PREFETCH_BUFFER)
+        dataset = dataset.shuffle(buffer_size=10)
+      dataset = dataset.prefetch(buffer_size=10)
 
       return dataset
 
@@ -404,17 +393,6 @@ class HiFiC(object):
     if self._auto_encoder_ckpt_path:
       self._prepare_auto_encoder_restore()
 
-    # The following is inspired by compare_gan/gans/modular_gan.py:
-    # Let's say we want to train the discriminator for D steps for every 1 step
-    # of generator training. We do the unroll_graph=True options:
-    # The features given to the model_fn are split into
-    # D + 1 sub-batches. The code then creates D train_ops for the
-    # discriminator, each feeding a different sub-batch of features
-    # into the discriminator.
-    # The train_op for the generator then depends on all these D train_ops
-    # and uses the last (D+1 th) sub-batch.
-    # Note that the graph is only created once.
-
     d_train_ops = []
     if self._setup_discriminator:
       tf.logging.info("Unrolling graph for discriminator")
@@ -424,8 +402,7 @@ class HiFiC(object):
         tf.summary.scalar("global_step", global_step)
         tf.summary.scalar("global_step_disc", self._global_step_disc)
 
-      # Create optimizer once, and then call minimize on it multiple times
-      # within self._train_discriminator.
+
       disc_optimizer = self._make_discriminator_optimizer(
           self._global_step_disc)
       for i, nodes in enumerate(nodes_disc):
@@ -435,8 +412,7 @@ class HiFiC(object):
                 self._train_discriminator(
                     nodes, disc_optimizer, create_summaries=(i == 0)))
 
-    # Depend on `d_train_ops`, which ensures all `self._num_steps_disc` steps of
-    # the discriminator will run before the generator training op.
+
     with tf.control_dependencies(d_train_ops):
       train_op = self._train_generator(nodes_gen, bpp_pair, global_step)
 
@@ -647,8 +623,7 @@ class HiFiC(object):
 
     self._add_hook(tf.train.NanTensorHook(d_loss))
 
-    # Getting the variables here because they don't exist before calling
-    # _compute_discriminator_out for the first time!
+
     disc_vars = self._discriminator.trainable_variables
 
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -838,7 +813,6 @@ class LPIPSLoss(object):
           tf.nest.map_structure(import_graph.as_graph_element, inputs),
           tf.nest.map_structure(import_graph.as_graph_element, outputs))
 
-    # Pack LPIPS network into a tf function
     graph_def = tf.GraphDef()
     with open(weight_path, "rb") as f:
       graph_def.ParseFromString(f.read())
@@ -848,13 +822,12 @@ class LPIPSLoss(object):
 
   def __call__(self, fake_image, real_image):
     """Assuming inputs are in [0, 1]."""
-    # Move inputs to [-1, 1] and NCHW format.
     def _transpose_to_nchw(x):
       return tf.transpose(x, (0, 3, 1, 2))
     fake_image = _transpose_to_nchw(fake_image * 2 - 1.0)
     real_image = _transpose_to_nchw(real_image * 2 - 1.0)
     loss = self._lpips_func(fake_image, real_image)
-    return tf.reduce_mean(loss)  # Loss is N111, take mean to get scalar.
+    return tf.reduce_mean(loss)  
 
 
 def _scheduled_value(value, schedule, step, name, summary=False):

@@ -67,8 +67,6 @@ def eval_trained_model(config_name,
         bpp = get_arithmetic_coding_bpp(
             bitstring, bitstring_np, num_pixels=h * w)
 
-        # metrics = {'psnr': get_psnr(inp_np, otp_np),
-        #            'bpp_real': bpp}
 
         metrics = {'psnr': get_psnr(inp_np, otp_np),
                    'bpp_real': bpp,
@@ -100,7 +98,6 @@ def eval_trained_model(config_name,
 
 def get_arithmetic_coding_bpp(bitstring, bitstring_np, num_pixels):
   """Calculate bitrate we obtain with arithmetic coding."""
-  # TODO(fab-jul): Add `compress` and `decompress` methods.
   packed = tfc.PackedTensors()
   packed.pack(tensors=bitstring, arrays=bitstring_np)
   return len(packed.string) * 8 / num_pixels

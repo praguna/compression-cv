@@ -15,11 +15,6 @@ _CONFIGS = {
             steps=[500000]),
         num_steps_disc=1,
         loss_config=helpers.Config(
-            # Constrain rate:
-            #   Loss = C * (1/lambda * R + CD * D) + CP * P
-            #       where
-            #          lambda = lambda_a if current_bpp > target
-            #                   lambda_b otherwise.
             CP=0.1 * 1.5 ** 1,  # Sweep over 0.1 * 1.5 ** x
             C=0.1 * 2. ** -5,
             CD=0.75,
@@ -43,11 +38,6 @@ _CONFIGS = {
             steps=[500000]),
         num_steps_disc=None,
         loss_config=helpers.Config(
-            # Constrain rate:
-            #   Loss = C * (1/lambda * R + CD * D) + CP * P
-            #       where
-            #          lambda = lambda_a if current_bpp > target
-            #                   lambda_b otherwise.
             CP=None,
             C=0.1 * 2. ** -5,
             CD=0.75,
